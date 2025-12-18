@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Davranış Şiddeti Değerlendirme</title>
+
+  <style>
+    :root{
+      --bg:#ffffff;
+      --text:#111;
+      --muted:#666;
+      --border:#e8e8e8;
+      --soft:#f7f7f7;
+      --focus:#0b5fff;
+      --radius:14px;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height:1.35;
+      padding:18px 14px 40px;
+    }
+
+    .wrap{
+      max-width:980px;
+      margin:0 auto;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    header{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      margin-bottom:4px;
+    }
+    h1{
+      margin:0;
+      font-size:18px;
+      font-weight:700;
+      letter-spacing:-0.2px;
+    }
+    .sub{
+      margin:0;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .card{
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      background:#fff;
+      padding:14px;
+    }
+
+    .section-title{
+      margin:0 0 10px 0;
+      font-size:14px;
+      font-weight:700;
+    }
+
+    /* --- TABLE --- */
+    .table-scroll{
+      overflow-x:auto;
+      -webkit-overflow-scrolling: touch;
+      border-radius:12px;
+      border:1px solid var(--border);
+    }
+
+    table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      min-width:720px; /* mobilde yatay kaydırma için */
+      background:#fff;
+    }
+
+    thead th{
+      position:sticky;
+      top:0;
+      background:var(--soft);
+      z-index:1;
+      font-weight:700;
+      font-size:12px;
+      color:#222;
+      border-bottom:1px solid var(--border);
+      padding:10px 10px;
+      text-align:center;
+      white-space:nowrap;
+    }
+    thead th:first-child{
+      text-align:left;
+      padding-left:12px;
+    }
+
+    tbody td{
+      border-bottom:1px solid var(--border);
+      padding:10px 10px;
+      text-align:center;
+      vertical-align:middle;
+    }
+    tbody tr:last-child td{
+      border-bottom:none;
+    }
+    tbody td:first-child{
+      text-align:left;
+      font-weight:600;
+      padding-left:12px;
+      white-space:nowrap;
+    }
+
+    /* radio: dokunma alanı büyük */
+    .rwrap{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-width:38px;
+      min-height:34px;
+    }
+    input[type="radio"]{
+      width:18px;
+      height:18px;
+      accent-color: var(--focus);
+      cursor:pointer;
+    }
+
+    /* --- STATUS / OUTPUT --- */
+    .status{
+      margin-top:10px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      font-size:12px;
+      color:#222;
+      background:#fff;
+    }
+    .pill b{font-weight:800}
+
+    .btn{
+      border:1px solid var(--border);
+      background:#fff;
+      color:#111;
+      border-radius:999px;
+      padding:9px 12px;
+      font-weight:700;
+      font-size:12px;
+      cursor:pointer;
+    }
+    .btn:focus{outline:3px solid rgba(11,95,255,.2); outline-offset:2px;}
+    .btn:hover{background:#fafafa}
+
+    .grid-2{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    @media (min-width: 860px){
+      .grid-2{grid-template-columns: 1.2fr .8fr;}
+    }
+
+    .hidden{display:none !important;}
+
+    .hint{
+      color:var(--muted);
+      font-size:12px;
+      margin:0;
+    }
+
+    /* chart alanı */
+    .chart-box{
+      border:1px dashed var(--border);
+      border-radius:12px;
+      padding:12px;
+      background:#fff;
+    }
+    canvas{max-width:100% !important;}
+
+    /* liste */
+    .list{
+      margin:0;
+      padding:0;
+      list-style:none;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#fff;
+      font-size:13px;
+    }
+    .row .name{font-weight:700}
+    .row .val{
+      font-weight:900;
+      min-width:34px;
+      text-align:right;
+    }
+
+    footer{
+      margin-top:2px;
+      color:var(--muted);
+      font-size:11px;
+    }
+  </style>
+
+  <!-- Radar grafik için Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Davranış Şiddeti Değerlendirme</h1>
+      <p class="sub">Her davranış için 1–9 arasında tek seçim yap. Tüm seçimler tamamlanınca radar grafik ve seçtiğin değerler aşağıda görünür.</p>
+    </header>
+
+    <!-- 1) ÜST BÖLÜM: DEĞERLENDİRME -->
+    <section class="card" aria-labelledby="sec-eval">
+      <h2 class="section-title" id="sec-eval">Değerlendirme</h2>
+
+      <div class="table-scroll" role="region" aria-label="Değerlendirme tablosu (yatay kaydırılabilir)">
+        <table id="evalTable">
+          <thead>
+            <tr>
+              <th>Davranış</th>
+              <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- JS dolduracak -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="status">
+        <span class="pill" id="progressPill">Tamamlanan: <b id="doneCount">0</b>/<b id="totalCount">0</b></span>
+        <button class="btn" id="resetBtn" type="button">Sıfırla</button>
+      </div>
+
+      <p class="hint" id="hintText">Not: Seçimler tamamlanınca grafik otomatik oluşur.</p>
+    </section>
+
+    <!-- 2) ORTA BÖLÜM: GRAFİK -->
+    <section class="card" aria-labelledby="sec-chart">
+      <h2 class="section-title" id="sec-chart">Grafik</h2>
+
+      <div id="chartGate" class="chart-box">
+        <p class="hint" id="chartHint">Grafiği görmek için tüm davranışları işaretle.</p>
+        <div id="chartWrap" class="hidden">
+          <canvas id="radarChart" height="300" aria-label="Radar grafik" role="img"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3) ALT BÖLÜM: LİSTE -->
+    <section class="card" aria-labelledby="sec-list">
+      <h2 class="section-title" id="sec-list">Seçim Listesi</h2>
+      <p class="hint" id="listHint">Liste, tüm seçimler tamamlanınca görünecek.</p>
+
+      <div id="listWrap" class="hidden">
+        <ul class="list" id="selectionList"></ul>
+      </div>
+    </section>
+
+    <footer>Arka plan: beyaz • Mobil uyum: tablo yatay kaydırılabilir</footer>
+  </div>
+
+  <script>
+    // Davranışlar alfabetik (Türkçe) sırada
+    const behaviors = [
+      "Duruş",
+      "Ellerin Kullanımı",
+      "Göz Teması",
+      "İçerik",
+      "Kelime Sayısı",
+      "Konuşma Hızı",
+      "Mimikler",
+      "Sesin Hacmi"
+    ];
+
+    const tableBody = document.querySelector("#evalTable tbody");
+    const doneCountEl = document.getElementById("doneCount");
+    const totalCountEl = document.getElementById("totalCount");
+    const resetBtn = document.getElementById("resetBtn");
+
+    const chartHint = document.getElementById("chartHint");
+    const chartWrap = document.getElementById("chartWrap");
+
+    const listHint = document.getElementById("listHint");
+    const listWrap = document.getElementById("listWrap");
+    const selectionList = document.getElementById("selectionList");
+
+    totalCountEl.textContent = behaviors.length;
+
+    // tablo satırlarını üret
+    function buildTable(){
+      tableBody.innerHTML = "";
+      behaviors.forEach((name, idx) => {
+        const tr = document.createElement("tr");
+
+        const tdName = document.createElement("td");
+        tdName.textContent = name;
+        tr.appendChild(tdName);
+
+        for(let v=1; v<=9; v++){
+          const td = document.createElement("td");
+          const wrap = document.createElement("div");
+          wrap.className = "rwrap";
+
+          const input = document.createElement("input");
+          input.type = "radio";
+          input.name = `b_${idx}`;           // aynı satır tek seçim
+          input.value = String(v);
+          input.setAttribute("aria-label", `${name} şiddet ${v}`);
+
+          input.addEventListener("change", onAnyChange);
+
+          wrap.appendChild(input);
+          td.appendChild(wrap);
+          tr.appendChild(td);
+        }
+
+        tableBody.appendChild(tr);
+      });
+    }
+
+    function getSelections(){
+      // her davranış için seçilen değeri (ya da null) döndür
+      return behaviors.map((b, idx) => {
+        const checked = document.querySelector(`input[name="b_${idx}"]:checked`);
+        return checked ? Number(checked.value) : null;
+      });
+    }
+
+    function updateProgress(selections){
+      const done = selections.filter(v => v !== null).length;
+      doneCountEl.textContent = done;
+      return done === behaviors.length;
+    }
+
+    let chartInstance = null;
+
+    function renderChart(labels, data){
+      const ctx = document.getElementById("radarChart");
+
+      if(chartInstance){
+        chartInstance.data.labels = labels;
+        chartInstance.data.datasets[0].data = data;
+        chartInstance.update();
+        return;
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: "radar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Şiddet (1–9)",
+            data,
+            fill: true,
+            borderWidth: 2,
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              min: 1,
+              max: 9,
+              ticks: {
+                stepSize: 1
+              }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${ctx.parsed.r}`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderList(labels, data){
+      selectionList.innerHTML = "";
+      labels.forEach((name, i) => {
+        const li = document.createElement("li");
+        li.className = "row";
+
+        const left = document.createElement("span");
+        left.className = "name";
+        left.textContent = name;
+
+        const right = document.createElement("span");
+        right.className = "val";
+        right.textContent = data[i];
+
+        li.appendChild(left);
+        li.appendChild(right);
+        selectionList.appendChild(li);
+      });
+    }
+
+    function onAnyChange(){
+      const selections = getSelections();
+      const allDone = updateProgress(selections);
+
+      if(!allDone){
+        chartHint.classList.remove("hidden");
+        chartWrap.classList.add("hidden");
+
+        listHint.classList.remove("hidden");
+        listWrap.classList.add("hidden");
+        return;
+      }
+
+      // hepsi seçildiyse: grafik + liste göster
+      chartHint.classList.add("hidden");
+      chartWrap.classList.remove("hidden");
+
+      listHint.classList.add("hidden");
+      listWrap.classList.remove("hidden");
+
+      // null yok, güvenle number array
+      const data = selections.map(Number);
+
+      renderChart(behaviors, data);
+      renderList(behaviors, data);
+    }
+
+    resetBtn.addEventListener("click", () => {
+      document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+      onAnyChange();
+      // Chart varsa temiz kalsın diye (istersen tamamen destroy edebilirim)
+      // Burada grafiği gizliyoruz, ama instance durabilir.
+    });
+
+    buildTable();
+    onAnyChange();
+  </script>
+</body>
+</html>
