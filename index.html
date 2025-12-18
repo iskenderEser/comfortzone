@@ -85,7 +85,7 @@
       position:sticky;
       top:0;
       background:var(--soft);
-      z-index:1;
+      z-index:3;
       font-weight:700;
       font-size:12px;
       color:#222;
@@ -94,7 +94,19 @@
       text-align:center;
       white-space:nowrap;
     }
+
+    /* SOL SÜTUN SABİT */
+    thead th:first-child,
+    tbody td:first-child{
+      position: sticky;
+      left: 0;
+      z-index: 4;
+      background: #fff;
+      box-shadow: 1px 0 0 var(--border);
+    }
     thead th:first-child{
+      background: var(--soft);
+      z-index: 6; /* header + sticky sol en üstte */
       text-align:left;
       padding-left:12px;
     }
@@ -112,6 +124,25 @@
       text-align:left;
       font-weight:600;
       padding-left:12px;
+      white-space:nowrap;
+    }
+
+    /* UÇ TANIM SATIRI (İNCE SATIR) */
+    .hint-row td{
+      padding:6px 10px;
+      border-bottom:none;
+      background:#fff;
+      font-size:11px;
+      color:var(--muted);
+    }
+    .hint-row td:first-child{
+      font-weight:600;
+      color:transparent; /* ilk hücreyi görünmez yap (sadece hizalama için) */
+      user-select:none;
+    }
+    .hint-row td.label{
+      font-weight:700;
+      color:var(--muted);
       white-space:nowrap;
     }
 
@@ -165,15 +196,6 @@
     }
     .btn:focus{outline:3px solid rgba(11,95,255,.2); outline-offset:2px;}
     .btn:hover{background:#fafafa}
-
-    .grid-2{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:12px;
-    }
-    @media (min-width: 860px){
-      .grid-2{grid-template-columns: 1.2fr .8fr;}
-    }
 
     .hidden{display:none !important;}
 
@@ -285,7 +307,7 @@
       </div>
     </section>
 
-    <footer>Arka plan: beyaz • Mobil uyum: tablo yatay kaydırılabilir</footer>
+    <footer>Arka plan: beyaz • Mobil uyum: tablo yatay kaydırılabilir • Sol sütun sabit</footer>
   </div>
 
   <script>
@@ -301,6 +323,19 @@
       "Sesin Hacmi"
     ];
 
+    // 1 ve 9 uç tanımları (görseldeki ifadeler)
+    // low = 1, high = 9
+    const endpoints = {
+      "Konuşma Hızı":       { low: "Yavaş",      high: "Hızlı" },
+      "Sesin Hacmi":        { low: "Zayıf",      high: "Güçlü" },
+      "Mimikler":           { low: "Kontrollü",  high: "Hareketli" },
+      "Göz Teması":         { low: "Dolaylı",    high: "Doğrudan" },
+      "Ellerin Kullanımı":  { low: "Az",         high: "Çok" },
+      "Duruş":              { low: "Çekingen",   high: "Atak" },
+      "İçerik":             { low: "Hikayeler",  high: "Gerçekler" },
+      "Kelime Sayısı":      { low: "Az",         high: "Çok" }
+    };
+
     const tableBody = document.querySelector("#evalTable tbody");
     const doneCountEl = document.getElementById("doneCount");
     const totalCountEl = document.getElementById("totalCount");
@@ -315,10 +350,33 @@
 
     totalCountEl.textContent = behaviors.length;
 
-    // tablo satırlarını üret
     function buildTable(){
       tableBody.innerHTML = "";
+
       behaviors.forEach((name, idx) => {
+        // 1) İnce "uç tanım" satırı
+        const hintTr = document.createElement("tr");
+        hintTr.className = "hint-row";
+
+        const hintFirst = document.createElement("td");
+        hintFirst.textContent = name; // görünmez ama hizalama için
+        hintTr.appendChild(hintFirst);
+
+        for(let v=1; v<=9; v++){
+          const td = document.createElement("td");
+          if(v === 1){
+            td.className = "label";
+            td.textContent = endpoints[name]?.low ?? "";
+          } else if(v === 9){
+            td.className = "label";
+            td.textContent = endpoints[name]?.high ?? "";
+          } else {
+            td.textContent = "";
+          }
+          hintTr.appendChild(td);
+        }
+
+        // 2) Asıl seçim satırı
         const tr = document.createElement("tr");
 
         const tdName = document.createElement("td");
@@ -332,10 +390,9 @@
 
           const input = document.createElement("input");
           input.type = "radio";
-          input.name = `b_${idx}`;           // aynı satır tek seçim
+          input.name = `b_${idx}`; // aynı satır tek seçim
           input.value = String(v);
           input.setAttribute("aria-label", `${name} şiddet ${v}`);
-
           input.addEventListener("change", onAnyChange);
 
           wrap.appendChild(input);
@@ -343,12 +400,12 @@
           tr.appendChild(td);
         }
 
+        tableBody.appendChild(hintTr);
         tableBody.appendChild(tr);
       });
     }
 
     function getSelections(){
-      // her davranış için seçilen değeri (ya da null) döndür
       return behaviors.map((b, idx) => {
         const checked = document.querySelector(`input[name="b_${idx}"]:checked`);
         return checked ? Number(checked.value) : null;
@@ -392,9 +449,7 @@
             r: {
               min: 1,
               max: 9,
-              ticks: {
-                stepSize: 1
-              }
+              ticks: { stepSize: 1 }
             }
           },
           plugins: {
@@ -442,16 +497,13 @@
         return;
       }
 
-      // hepsi seçildiyse: grafik + liste göster
       chartHint.classList.add("hidden");
       chartWrap.classList.remove("hidden");
 
       listHint.classList.add("hidden");
       listWrap.classList.remove("hidden");
 
-      // null yok, güvenle number array
       const data = selections.map(Number);
-
       renderChart(behaviors, data);
       renderList(behaviors, data);
     }
@@ -459,8 +511,6 @@
     resetBtn.addEventListener("click", () => {
       document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
       onAnyChange();
-      // Chart varsa temiz kalsın diye (istersen tamamen destroy edebilirim)
-      // Burada grafiği gizliyoruz, ama instance durabilir.
     });
 
     buildTable();
