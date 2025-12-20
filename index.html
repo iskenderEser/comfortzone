@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Konfor Alanı Davranışları Belirleme</title>
+  <title>Davranış Şiddeti Değerlendirme</title>
 
   <style>
     :root{
@@ -77,7 +77,7 @@
       width:100%;
       border-collapse:separate;
       border-spacing:0;
-      min-width:720px;
+      min-width:720px; /* mobilde yatay kaydırma için */
       background:#fff;
     }
 
@@ -95,6 +95,7 @@
       white-space:nowrap;
     }
 
+    /* SOL SÜTUN SABİT */
     thead th:first-child,
     tbody td:first-child{
       position: sticky;
@@ -105,7 +106,7 @@
     }
     thead th:first-child{
       background: var(--soft);
-      z-index: 6;
+      z-index: 6; /* header + sticky sol en üstte */
       text-align:left;
       padding-left:12px;
     }
@@ -126,6 +127,7 @@
       white-space:nowrap;
     }
 
+    /* UÇ TANIM SATIRI (İNCE SATIR) */
     .hint-row td{
       padding:6px 10px;
       border-bottom:none;
@@ -135,7 +137,7 @@
     }
     .hint-row td:first-child{
       font-weight:600;
-      color:transparent;
+      color:transparent; /* ilk hücreyi görünmez yap (sadece hizalama için) */
       user-select:none;
     }
     .hint-row td.label{
@@ -144,6 +146,7 @@
       white-space:nowrap;
     }
 
+    /* radio: dokunma alanı büyük */
     .rwrap{
       display:flex;
       align-items:center;
@@ -158,6 +161,7 @@
       cursor:pointer;
     }
 
+    /* --- STATUS / OUTPUT --- */
     .status{
       margin-top:10px;
       display:flex;
@@ -190,6 +194,8 @@
       font-size:12px;
       cursor:pointer;
     }
+    .btn:focus{outline:3px solid rgba(11,95,255,.2); outline-offset:2px;}
+    .btn:hover{background:#fafafa}
 
     .hidden{display:none !important;}
 
@@ -199,15 +205,16 @@
       margin:0;
     }
 
+    /* chart alanı */
     .chart-box{
       border:1px dashed var(--border);
       border-radius:12px;
       padding:12px;
       background:#fff;
     }
-
     canvas{max-width:100% !important;}
 
+    /* liste */
     .list{
       margin:0;
       padding:0;
@@ -241,14 +248,273 @@
     }
   </style>
 
+  <!-- Radar grafik için Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 
 <body>
   <div class="wrap">
     <header>
-      <h1>Konfor Alanı Davranışları Belirleme</h1>
+      <h1>Davranış Şiddeti Değerlendirme</h1>
       <p class="sub">Her davranış için 1–9 arasında tek seçim yap. Tüm seçimler tamamlanınca radar grafik ve seçtiğin değerler aşağıda görünür.</p>
     </header>
 
-    <!-- geri kalan kod birebir aynıdır -->
+    <!-- 1) ÜST BÖLÜM: DEĞERLENDİRME -->
+    <section class="card" aria-labelledby="sec-eval">
+      <h2 class="section-title" id="sec-eval">Değerlendirme</h2>
+
+      <div class="table-scroll" role="region" aria-label="Değerlendirme tablosu (yatay kaydırılabilir)">
+        <table id="evalTable">
+          <thead>
+            <tr>
+              <th>Davranış</th>
+              <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- JS dolduracak -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="status">
+        <span class="pill" id="progressPill">Tamamlanan: <b id="doneCount">0</b>/<b id="totalCount">0</b></span>
+        <button class="btn" id="resetBtn" type="button">Sıfırla</button>
+      </div>
+
+      <p class="hint" id="hintText">Not: Seçimler tamamlanınca grafik otomatik oluşur.</p>
+    </section>
+
+    <!-- 2) ORTA BÖLÜM: GRAFİK -->
+    <section class="card" aria-labelledby="sec-chart">
+      <h2 class="section-title" id="sec-chart">Grafik</h2>
+
+      <div id="chartGate" class="chart-box">
+        <p class="hint" id="chartHint">Grafiği görmek için tüm davranışları işaretle.</p>
+        <div id="chartWrap" class="hidden">
+          <canvas id="radarChart" height="300" aria-label="Radar grafik" role="img"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3) ALT BÖLÜM: LİSTE -->
+    <section class="card" aria-labelledby="sec-list">
+      <h2 class="section-title" id="sec-list">Seçim Listesi</h2>
+      <p class="hint" id="listHint">Liste, tüm seçimler tamamlanınca görünecek.</p>
+
+      <div id="listWrap" class="hidden">
+        <ul class="list" id="selectionList"></ul>
+      </div>
+    </section>
+
+    <footer>Arka plan: beyaz • Mobil uyum: tablo yatay kaydırılabilir • Sol sütun sabit</footer>
+  </div>
+
+  <script>
+    // Davranışlar alfabetik (Türkçe) sırada
+    const behaviors = [
+      "Duruş",
+      "Ellerin Kullanımı",
+      "Göz Teması",
+      "İçerik",
+      "Kelime Sayısı",
+      "Konuşma Hızı",
+      "Mimikler",
+      "Sesin Hacmi"
+    ];
+
+    // 1 ve 9 uç tanımları (görseldeki ifadeler)
+    // low = 1, high = 9
+    const endpoints = {
+      "Konuşma Hızı":       { low: "Yavaş",      high: "Hızlı" },
+      "Sesin Hacmi":        { low: "Zayıf",      high: "Güçlü" },
+      "Mimikler":           { low: "Kontrollü",  high: "Hareketli" },
+      "Göz Teması":         { low: "Dolaylı",    high: "Doğrudan" },
+      "Ellerin Kullanımı":  { low: "Az",         high: "Çok" },
+      "Duruş":              { low: "Çekingen",   high: "Atak" },
+      "İçerik":             { low: "Hikayeler",  high: "Gerçekler" },
+      "Kelime Sayısı":      { low: "Az",         high: "Çok" }
+    };
+
+    const tableBody = document.querySelector("#evalTable tbody");
+    const doneCountEl = document.getElementById("doneCount");
+    const totalCountEl = document.getElementById("totalCount");
+    const resetBtn = document.getElementById("resetBtn");
+
+    const chartHint = document.getElementById("chartHint");
+    const chartWrap = document.getElementById("chartWrap");
+
+    const listHint = document.getElementById("listHint");
+    const listWrap = document.getElementById("listWrap");
+    const selectionList = document.getElementById("selectionList");
+
+    totalCountEl.textContent = behaviors.length;
+
+    function buildTable(){
+      tableBody.innerHTML = "";
+
+      behaviors.forEach((name, idx) => {
+        // 1) İnce "uç tanım" satırı
+        const hintTr = document.createElement("tr");
+        hintTr.className = "hint-row";
+
+        const hintFirst = document.createElement("td");
+        hintFirst.textContent = name; // görünmez ama hizalama için
+        hintTr.appendChild(hintFirst);
+
+        for(let v=1; v<=9; v++){
+          const td = document.createElement("td");
+          if(v === 1){
+            td.className = "label";
+            td.textContent = endpoints[name]?.low ?? "";
+          } else if(v === 9){
+            td.className = "label";
+            td.textContent = endpoints[name]?.high ?? "";
+          } else {
+            td.textContent = "";
+          }
+          hintTr.appendChild(td);
+        }
+
+        // 2) Asıl seçim satırı
+        const tr = document.createElement("tr");
+
+        const tdName = document.createElement("td");
+        tdName.textContent = name;
+        tr.appendChild(tdName);
+
+        for(let v=1; v<=9; v++){
+          const td = document.createElement("td");
+          const wrap = document.createElement("div");
+          wrap.className = "rwrap";
+
+          const input = document.createElement("input");
+          input.type = "radio";
+          input.name = `b_${idx}`; // aynı satır tek seçim
+          input.value = String(v);
+          input.setAttribute("aria-label", `${name} şiddet ${v}`);
+          input.addEventListener("change", onAnyChange);
+
+          wrap.appendChild(input);
+          td.appendChild(wrap);
+          tr.appendChild(td);
+        }
+
+        tableBody.appendChild(hintTr);
+        tableBody.appendChild(tr);
+      });
+    }
+
+    function getSelections(){
+      return behaviors.map((b, idx) => {
+        const checked = document.querySelector(`input[name="b_${idx}"]:checked`);
+        return checked ? Number(checked.value) : null;
+      });
+    }
+
+    function updateProgress(selections){
+      const done = selections.filter(v => v !== null).length;
+      doneCountEl.textContent = done;
+      return done === behaviors.length;
+    }
+
+    let chartInstance = null;
+
+    function renderChart(labels, data){
+      const ctx = document.getElementById("radarChart");
+
+      if(chartInstance){
+        chartInstance.data.labels = labels;
+        chartInstance.data.datasets[0].data = data;
+        chartInstance.update();
+        return;
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: "radar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Şiddet (1–9)",
+            data,
+            fill: true,
+            borderWidth: 2,
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              min: 1,
+              max: 9,
+              ticks: { stepSize: 1 }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${ctx.parsed.r}`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderList(labels, data){
+      selectionList.innerHTML = "";
+      labels.forEach((name, i) => {
+        const li = document.createElement("li");
+        li.className = "row";
+
+        const left = document.createElement("span");
+        left.className = "name";
+        left.textContent = name;
+
+        const right = document.createElement("span");
+        right.className = "val";
+        right.textContent = data[i];
+
+        li.appendChild(left);
+        li.appendChild(right);
+        selectionList.appendChild(li);
+      });
+    }
+
+    function onAnyChange(){
+      const selections = getSelections();
+      const allDone = updateProgress(selections);
+
+      if(!allDone){
+        chartHint.classList.remove("hidden");
+        chartWrap.classList.add("hidden");
+
+        listHint.classList.remove("hidden");
+        listWrap.classList.add("hidden");
+        return;
+      }
+
+      chartHint.classList.add("hidden");
+      chartWrap.classList.remove("hidden");
+
+      listHint.classList.add("hidden");
+      listWrap.classList.remove("hidden");
+
+      const data = selections.map(Number);
+      renderChart(behaviors, data);
+      renderList(behaviors, data);
+    }
+
+    resetBtn.addEventListener("click", () => {
+      document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+      onAnyChange();
+    });
+
+    buildTable();
+    onAnyChange();
+  </script>
+</body>
+</html>
